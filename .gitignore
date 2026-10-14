@@ -1,0 +1,17 @@
+# clasp credentials and project binding (contain account / script identifiers)
+.clasprc.json
+.clasp.json
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local env files, never commit secrets
+.env
+.env.*
