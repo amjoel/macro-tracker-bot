@@ -2,6 +2,9 @@
 .clasprc.json
 .clasp.json
 
+# Local scratch test harness
+.harness/
+
 # Node
 node_modules/
 npm-debug.log*

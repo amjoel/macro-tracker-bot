@@ -78,7 +78,7 @@ Secrets are only ever read from Script Properties at runtime. They are not store
 ```bash
 npm install -g @google/clasp
 clasp login
-cp .clasp.json.example .clasp.json   # then fill in your scriptId
+cp .clasp.json.example .clasp.json   # then fill in your scriptId (rootDir is src)
 clasp push                           # upload code to Apps Script
 clasp redeploy <deploymentId> -d "message"   # make the live web app use it
 clasp logs                           # view execution logs
@@ -89,10 +89,28 @@ clasp logs                           # view execution logs
 ## Project structure
 
 ```
-Code.js           All bot logic (webhook handler, Gemini, Sheets, caching)
-Debug.js          Helpers to run from the Apps Script editor (Gemini and webhook checks)
-appsscript.json   Apps Script manifest (runtime, timezone, web app access)
+src/
+  Main.js          doPost webhook entry point, duplicate update check, error reporting
+  Router.js        Maps a text message to a command handler or to food logging
+  FoodLogging.js   Preset, then macro cache, then Gemini, then log and reply
+  Gemini.js        Model fallback, rate limit cooldowns, response parsing
+  MacroCache.js    Three layer cache so the same text always gives the same macros
+  Presets.js       Saved shortcuts and /addpreset
+  Goals.js         Daily goals and /setgoals
+  Weight.js        /weight and the moving average
+  Weekly.js        Weekly budget rollover and the summary message
+  Undo.js          Undo last entry and the inline undo button
+  Telegram.js      Bot API calls and keyboards
+  Messages.js      Text builders for replies
+  SheetsDb.js      Sheet access helpers and the Logs and Dashboard readers
+  Dates.js         Date helpers
+  Config.js        Secrets, sheet names, cache lifetimes, chat whitelist
+  Triggers.js      Entry points for time-driven triggers
+  Debug.js         Helpers to run from the Apps Script editor
+  appsscript.json  Apps Script manifest (runtime, timezone, web app access)
 ```
+
+Apps Script has no imports, so every file shares one global scope and functions call each other directly. Top level code only builds constants. Anything that needs another file runs inside a function, so file load order does not matter.
 
 ## Tech
 
