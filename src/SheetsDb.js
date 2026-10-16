@@ -37,7 +37,18 @@ function getOrCreateSheet(name, headers, hidden) {
     return sheet;
 }
 
-/** Appends one food entry to the Logs sheet. */
+/**
+ * Short unique id for a log entry. It starts with a letter so Sheets never
+ * reads it as a number (which could drop leading zeros or turn it into 1e5).
+ */
+function generateEntryId_() {
+    return 'k' + Utilities.getUuid().replace(/-/g, '').substring(0, 9);
+}
+
+/**
+ * Appends one food entry to the Logs sheet.
+ * @returns {string} the new entry's id, used by the undo button
+ */
 function logToSheet(rawInput, foodItem, calories, protein, carbs = 0, fats = 0) {
     const sheet = getSheet(SHEET.LOGS);
     const now = new Date();
@@ -45,24 +56,65 @@ function logToSheet(rawInput, foodItem, calories, protein, carbs = 0, fats = 0) 
 
     const dateStr = formatYmd(now, timeZone);
     const timeStr = Utilities.formatDate(now, timeZone, 'HH:mm');
+    const entryId = generateEntryId_();
 
-    sheet.appendRow([dateStr, timeStr, rawInput, foodItem, calories, protein, carbs, fats]);
+    sheet.appendRow([dateStr, timeStr, rawInput, foodItem, calories, protein, carbs, fats, entryId]);
+    return entryId;
 }
 
 /**
- * Today's total macros.
- * Reads values pre-computed by SUMIFS formulas in the Dashboard sheet (B1:B4),
- * which is much cheaper than looping over every log row in script.
+ * Finds the row of a log entry by its id, or -1 when it is gone.
+ * Uses a server side search, so it does not read the whole sheet.
  */
-function getDailyProgress() {
-    const dashboard = getSheet(SHEET.DASHBOARD);
-    if (!dashboard) return { calories: 0, protein: 0, carbs: 0, fats: 0 };
+function findLogRowById_(entryId) {
+    const sheet = getSheet(SHEET.LOGS);
+    if (!sheet || !entryId) return -1;
 
-    const vals = dashboard.getRange('B1:B4').getValues();
-    return {
-        calories: Number(vals[0][0]) || 0,
-        protein: Number(vals[1][0]) || 0,
-        carbs: Number(vals[2][0]) || 0,
-        fats: Number(vals[3][0]) || 0
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return -1;
+
+    const found = sheet.getRange(2, LOG_COL.ENTRY_ID, lastRow - 1, 1)
+        .createTextFinder(entryId)
+        .matchEntireCell(true)
+        .matchCase(true)
+        .findNext();
+    return found ? found.getRow() : -1;
+}
+
+/**
+ * Everything the bot needs from the Dashboard sheet in one read.
+ *
+ * Dashboard column B holds formulas, so the sheet does the adding up
+ *   B1 to B4  today's calories, protein, carbs, fats
+ *   B5        start (Monday) of this week
+ *   B6        this week's total budget
+ *   B7        this week's rollover in
+ *   B8        calories eaten so far this week
+ */
+function getDashboardSnapshot() {
+    const snapshot = {
+        calories: 0, protein: 0, carbs: 0, fats: 0,
+        weekTotalBudget: 0, weekRolloverIn: 0, weekConsumed: 0
     };
+
+    const dashboard = getSheet(SHEET.DASHBOARD);
+    if (!dashboard) return snapshot;
+
+    const vals = dashboard.getRange('B1:B8').getValues();
+    const num = i => Number(vals[i][0]) || 0;
+
+    snapshot.calories = num(0);
+    snapshot.protein = num(1);
+    snapshot.carbs = num(2);
+    snapshot.fats = num(3);
+    snapshot.weekTotalBudget = num(5);
+    snapshot.weekRolloverIn = num(6);
+    snapshot.weekConsumed = num(7);
+    return snapshot;
+}
+
+/** Today's total macros, taken from the Dashboard sheet. */
+function getDailyProgress() {
+    const s = getDashboardSnapshot();
+    return { calories: s.calories, protein: s.protein, carbs: s.carbs, fats: s.fats };
 }

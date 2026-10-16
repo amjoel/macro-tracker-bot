@@ -1,6 +1,18 @@
-/** Scale weight logging with a 7 entry moving average. */
+/**
+ * Scale weight logging with a 7 day average.
+ *
+ * Weight columns: A Date, B Weight (kg), C 7-Day Moving Avg (kg).
+ * The bot writes A and B. Column C is a formula that averages every weigh-in
+ * from the 7 days up to and including that row's date (that day and the 6
+ * before it), so the average means the same thing however often you weigh in.
+ */
 
 const WEIGHT_HEADERS = ['Date', 'Weight (kg)', '7-Day Moving Avg (kg)'];
+
+/** Formula for column C of the Weight row at this sheet row. */
+function weightAverageFormula_(row) {
+    return `=ROUND(AVERAGEIFS($B$2:$B,$A$2:$A,">="&A${row}-6,$A$2:$A,"<="&A${row}),2)`;
+}
 
 /** Handles /weight 68.5 */
 function handleWeightLogging(chatId, text) {
@@ -17,21 +29,14 @@ function handleWeightLogging(chatId, text) {
     const timeZone = Session.getScriptTimeZone();
     const dateStr = formatYmd(new Date(), timeZone);
 
-    // Average of today's weight and up to the 6 most recent earlier entries
-    const data = weightSheet.getDataRange().getValues();
-    let sum = weightNum;
-    let count = 1;
+    weightSheet.appendRow([dateStr, weightNum]);
+    const row = weightSheet.getLastRow();
+    weightSheet.getRange(row, 3).setFormula(weightAverageFormula_(row));
 
-    for (let i = data.length - 1; i >= 1 && count < 7; i--) {
-        const val = parseFloat(data[i][1]);
-        if (!isNaN(val)) {
-            sum += val;
-            count++;
-        }
-    }
-    const movingAvg = (sum / count).toFixed(2);
-
-    weightSheet.appendRow([dateStr, weightNum, movingAvg]);
+    // Let the sheet work out the average, then read it back
+    SpreadsheetApp.flush();
+    const average = Number(weightSheet.getRange(row, 3).getValue());
+    const movingAvg = (isNaN(average) ? weightNum : average).toFixed(2);
 
     sendTelegramMessage(
         chatId,

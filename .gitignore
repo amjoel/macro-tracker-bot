@@ -5,6 +5,9 @@
 # Local scratch test harness
 .harness/
 
+# Spreadsheet exports contain personal food and weight logs
+*.xlsx
+
 # Node
 node_modules/
 npm-debug.log*

@@ -1,21 +1,54 @@
-/** Daily calorie, protein and carb goals (stored in Script Properties). */
+/**
+ * Daily calorie, protein and carb goals.
+ *
+ * The goals live in the Settings sheet so the sheet formulas (the Daily sheet)
+ * and the bot always use the same numbers. You can edit them there by hand or
+ * with /setgoals.
+ */
 
 const DEFAULT_GOALS = { calories: 2300, protein: 80, carbs: 300 };
+const GOALS_CACHE_KEY = 'GOALS';
+const CACHE_TTL_GOALS = 120;   // short, so a goal edited by hand shows up within 2 minutes
+
+let _goals = null;   // request-scoped
 
 function getGoals() {
-    const props = PropertiesService.getScriptProperties();
+    if (_goals) return _goals;
+
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(GOALS_CACHE_KEY);
+    if (cached) {
+        _goals = JSON.parse(cached);
+        return _goals;
+    }
+
+    _goals = readGoals_();
+    try { cache.put(GOALS_CACHE_KEY, JSON.stringify(_goals), CACHE_TTL_GOALS); } catch (e) { }
+    return _goals;
+}
+
+/** Reads the Settings sheet. A missing or blank value falls back to the default. */
+function readGoals_() {
+    const sheet = getSheet(SHEET.SETTINGS);
+    if (!sheet) return Object.assign({}, DEFAULT_GOALS);
+
+    const vals = sheet.getRange(SETTINGS_ROW.CALORIES, 2, 3, 1).getValues();
     return {
-        calories: Number(props.getProperty('GOAL_CALORIES')) || DEFAULT_GOALS.calories,
-        protein: Number(props.getProperty('GOAL_PROTEIN')) || DEFAULT_GOALS.protein,
-        carbs: Number(props.getProperty('GOAL_CARBS')) || DEFAULT_GOALS.carbs
+        calories: Number(vals[0][0]) || DEFAULT_GOALS.calories,
+        protein: Number(vals[1][0]) || DEFAULT_GOALS.protein,
+        carbs: Number(vals[2][0]) || DEFAULT_GOALS.carbs
     };
 }
 
 function setGoals(calories, protein, carbs) {
-    const props = PropertiesService.getScriptProperties();
-    props.setProperty('GOAL_CALORIES', calories.toString());
-    props.setProperty('GOAL_PROTEIN', protein.toString());
-    props.setProperty('GOAL_CARBS', carbs.toString());
+    if (!getSheet(SHEET.SETTINGS)) ensureSettings_();
+
+    getSheet(SHEET.SETTINGS)
+        .getRange(SETTINGS_ROW.CALORIES, 2, 3, 1)
+        .setValues([[calories], [protein], [carbs]]);
+
+    _goals = null;
+    try { CacheService.getScriptCache().remove(GOALS_CACHE_KEY); } catch (e) { }
 }
 
 /** Handles /setgoals Calories,Protein,Carbs */

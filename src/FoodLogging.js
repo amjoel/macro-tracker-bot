@@ -51,18 +51,17 @@ function handleFoodEntry(chatId, rawText) {
  * @param {{foodItem:string, calories:number, protein:number, carbs:number, fats:number}} macros
  */
 function logAndReply(chatId, rawText, macros, header) {
-    logToSheet(rawText, macros.foodItem, macros.calories, macros.protein, macros.carbs, macros.fats);
+    const entryId = logToSheet(rawText, macros.foodItem, macros.calories, macros.protein, macros.carbs, macros.fats);
 
-    // Single Logs read shared by the weekly update
-    const logsData = getSheet(SHEET.LOGS).getDataRange().getValues();
-    updateCurrentWeekConsumed(logsData);
+    // The Dashboard and Weekly Summary totals are sheet formulas, so make sure
+    // the new row is counted before reading them
+    SpreadsheetApp.flush();
     const progress = getDailyProgress();
-    const lastRow = getSheet(SHEET.LOGS).getLastRow();
 
     sendTelegramMessage(
         chatId,
         formatLoggedMessage(header, macros, progress),
         getMainMenuKeyboard(),
-        getUndoInlineKeyboard(lastRow)
+        getUndoInlineKeyboard(entryId)
     );
 }

@@ -89,11 +89,11 @@ function getMainMenuKeyboard() {
     };
 }
 
-/** Inline button that undoes the log entry stored in the given sheet row. */
-function getUndoInlineKeyboard(rowNumber) {
+/** Inline button that undoes the log entry with the given id. */
+function getUndoInlineKeyboard(entryId) {
     return {
         inline_keyboard: [
-            [{ text: '↩️ Undo This Entry', callback_data: `undo_row_${rowNumber}` }]
+            [{ text: '↩️ Undo This Entry', callback_data: UNDO_CALLBACK_PREFIX + entryId }]
         ]
     };
 }
