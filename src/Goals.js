@@ -4,9 +4,13 @@
  * The goals live in the Settings sheet so the sheet formulas (the Daily sheet)
  * and the bot always use the same numbers. You can edit them there by hand or
  * with /setgoals.
+ *
+ * These are the base goals. Each day's actual calorie and protein targets are
+ * adjusted to what is left of the week (see the Dashboard formulas in
+ * SetupSheets.js), and the bot reads them with getDailyProgress().
  */
 
-const DEFAULT_GOALS = { calories: 2300, protein: 80, carbs: 300 };
+const DEFAULT_GOALS = { calories: 2300, protein: 80, carbs: 300, minCalories: 2000 };
 const GOALS_CACHE_KEY = 'GOALS';
 const CACHE_TTL_GOALS = 120;   // short, so a goal edited by hand shows up within 2 minutes
 
@@ -32,11 +36,12 @@ function readGoals_() {
     const sheet = getSheet(SHEET.SETTINGS);
     if (!sheet) return Object.assign({}, DEFAULT_GOALS);
 
-    const vals = sheet.getRange(SETTINGS_ROW.CALORIES, 2, 3, 1).getValues();
+    const vals = sheet.getRange(SETTINGS_ROW.CALORIES, 2, 4, 1).getValues();
     return {
         calories: Number(vals[0][0]) || DEFAULT_GOALS.calories,
         protein: Number(vals[1][0]) || DEFAULT_GOALS.protein,
-        carbs: Number(vals[2][0]) || DEFAULT_GOALS.carbs
+        carbs: Number(vals[2][0]) || DEFAULT_GOALS.carbs,
+        minCalories: Number(vals[3][0]) || DEFAULT_GOALS.minCalories
     };
 }
 
@@ -111,11 +116,11 @@ function handleViewGoals(chatId) {
     sendTelegramMessage(
         chatId,
         `🎯 *Your Daily Goals*\n\n` +
-        `• *Calories:* ${goals.calories} kcal\n` +
-        `• *Protein:* ${goals.protein}g\n` +
+        `• *Calories:* ${goals.calories} kcal (adjusted daily, never below ${goals.minCalories})\n` +
+        `• *Protein:* ${goals.protein}g (adjusted daily, never below this)\n` +
         `• *Carbs:* ${goals.carbs}g\n\n` +
         formatDailyProgress(progress) + `\n\n` +
-        `_Use_ \`/setgoals Cal,Prot,Carbs\` _to change._`,
+        `_Use_ \`/setgoals Cal,Prot,Carbs\` _to change. The minimum is in the Settings sheet._`,
         getMainMenuKeyboard()
     );
 }

@@ -7,6 +7,7 @@
 
 const PRESETS_CACHE_KEY = 'PRESETS_DATA';
 const PRESETS_HEADERS = ['Shortcut Key', 'Item Name', 'Calories', 'Protein', 'Carbs', 'Fat'];
+const MAX_SHORTCUT_LENGTH = 40;
 
 let _presetsData = null;  // L0
 
@@ -99,32 +100,47 @@ function handleAddPreset(chatId, text) {
         return;
     }
 
-    const shortcut = parts[0];
-    const itemName = parts[1];
-    const calories = Number(parts[2]) || 0;
-    const protein = Number(parts[3]) || 0;
-    const carbs = parts.length > 4 ? (Number(parts[4]) || 0) : 0;
-    const fats = parts.length > 5 ? (Number(parts[5]) || 0) : 0;
+    const preset = {
+        shortcut: parts[0],
+        itemName: parts[1],
+        calories: Number(parts[2]) || 0,
+        protein: Number(parts[3]) || 0,
+        carbs: parts.length > 4 ? (Number(parts[4]) || 0) : 0,
+        fats: parts.length > 5 ? (Number(parts[5]) || 0) : 0
+    };
 
-    if (!shortcut || !itemName) {
+    if (!preset.shortcut || !preset.itemName) {
         sendTelegramMessage(chatId, '⚠️ Shortcut key and Item Name cannot be empty.', getMainMenuKeyboard());
         return;
     }
 
+    const problem = getShortcutProblem(preset.shortcut);
+    if (problem) {
+        sendTelegramMessage(chatId, `⚠️ ${problem}`, getMainMenuKeyboard());
+        return;
+    }
+
+    addPreset(preset);
+    sendTelegramMessage(chatId, formatPresetAddedMessage(preset), getMainMenuKeyboard());
+}
+
+/** Appends a preset to the Presets sheet and clears the cache so the keyboard shows it. */
+function addPreset(preset) {
     const presetSheet = getOrCreateSheet(SHEET.PRESETS, PRESETS_HEADERS);
-    presetSheet.appendRow([shortcut, itemName, calories, protein, carbs, fats]);
-
-    // Invalidate so getMainMenuKeyboard() picks up the new preset
+    presetSheet.appendRow([preset.shortcut, preset.itemName, preset.calories, preset.protein, preset.carbs, preset.fats]);
     invalidatePresetsCache();
+}
 
-    sendTelegramMessage(
-        chatId,
-        `✅ *Preset Added!*\n\n` +
-        `🔑 *Shortcut:* \`${shortcut}\`\n` +
-        `🍽 *Item:* ${itemName}\n` +
-        `🔥 *Calories:* ${calories} kcal\n` +
-        `💪 *Protein:* ${protein}g | *Carbs:* ${carbs}g | *Fat:* ${fats}g\n\n` +
-        `Just type \`${shortcut}\` to log it instantly!`,
-        getMainMenuKeyboard()
-    );
+/**
+ * Returns why a shortcut can't be used, or null when it is fine. A shortcut
+ * is typed or tapped as a keyboard button, so it must not clash with another
+ * preset, a command, or a menu button.
+ */
+function getShortcutProblem(shortcut) {
+    if (!shortcut) return "The shortcut can't be empty.";
+    if (shortcut.length > MAX_SHORTCUT_LENGTH) return `Keep the shortcut to ${MAX_SHORTCUT_LENGTH} characters or fewer.`;
+    if (/[`\n]/.test(shortcut)) return "The shortcut can't contain backticks or line breaks.";
+    if (shortcut.startsWith('/') || findCommandRoute(shortcut)) return `\`${shortcut}\` is already a bot command or button.`;
+    if (checkPreset(shortcut)) return `You already have a preset called \`${shortcut}\`.`;
+    return null;
 }

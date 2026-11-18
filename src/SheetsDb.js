@@ -90,17 +90,23 @@ function findLogRowById_(entryId) {
  *   B6        this week's total budget
  *   B7        this week's rollover in
  *   B8        calories eaten so far this week
+ *   B13, B14  today's adjusted calorie and protein targets
+ *
+ * Until setupSheets has added rows 10 to 14, the targets fall back to the
+ * plain goals from Settings.
  */
 function getDashboardSnapshot() {
+    const goals = getGoals();
     const snapshot = {
         calories: 0, protein: 0, carbs: 0, fats: 0,
-        weekTotalBudget: 0, weekRolloverIn: 0, weekConsumed: 0
+        weekTotalBudget: 0, weekRolloverIn: 0, weekConsumed: 0,
+        targets: { calories: goals.calories, protein: goals.protein, carbs: goals.carbs }
     };
 
     const dashboard = getSheet(SHEET.DASHBOARD);
     if (!dashboard) return snapshot;
 
-    const vals = dashboard.getRange('B1:B8').getValues();
+    const vals = dashboard.getRange('B1:B14').getValues();
     const num = i => Number(vals[i][0]) || 0;
 
     snapshot.calories = num(0);
@@ -110,11 +116,13 @@ function getDashboardSnapshot() {
     snapshot.weekTotalBudget = num(5);
     snapshot.weekRolloverIn = num(6);
     snapshot.weekConsumed = num(7);
+    if (num(12) > 0) snapshot.targets.calories = num(12);
+    if (num(13) > 0) snapshot.targets.protein = num(13);
     return snapshot;
 }
 
-/** Today's total macros, taken from the Dashboard sheet. */
+/** Today's total macros and today's targets, taken from the Dashboard sheet. */
 function getDailyProgress() {
     const s = getDashboardSnapshot();
-    return { calories: s.calories, protein: s.protein, carbs: s.carbs, fats: s.fats };
+    return { calories: s.calories, protein: s.protein, carbs: s.carbs, fats: s.fats, targets: s.targets };
 }

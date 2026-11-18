@@ -62,6 +62,7 @@ function logAndReply(chatId, rawText, macros, header) {
         chatId,
         formatLoggedMessage(header, macros, progress),
         getMainMenuKeyboard(),
-        getUndoInlineKeyboard(entryId)
+        // An entry logged from a preset is already a preset, so don't offer to save it
+        getLogInlineKeyboard(entryId, header !== REPLY_HEADERS.PRESET)
     );
 }

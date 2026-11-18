@@ -31,6 +31,10 @@ const COMMAND_ROUTES = [
         run: (chatId, text) => handleAddPreset(chatId, text)
     },
     {
+        matches: t => /^\/savepreset/i.test(t),
+        run: (chatId, text) => handleSavePresetCommand(chatId, text)
+    },
+    {
         matches: t => /^\/setgoals/i.test(t),
         run: (chatId, text) => handleSetGoals(chatId, text)
     },
@@ -52,7 +56,10 @@ function routeMessage(chatId, message) {
 
     const rawText = message.text.trim();
 
-    const route = COMMAND_ROUTES.find(r => r.matches(rawText));
+    // A reply to "name this preset" is a shortcut name, not a meal
+    if (handlePresetPromptReply(chatId, message, rawText)) return;
+
+    const route = findCommandRoute(rawText);
     if (route) {
         route.run(chatId, rawText);
         return;
@@ -60,4 +67,27 @@ function routeMessage(chatId, message) {
 
     // Anything else is treated as a meal description
     handleFoodEntry(chatId, rawText);
+}
+
+/** Returns the command route that handles this text, or null. */
+function findCommandRoute(text) {
+    return COMMAND_ROUTES.find(r => r.matches(text)) || null;
+}
+
+/** Sends a tap on an inline button to the right handler. */
+function handleCallbackQuery(callbackQuery) {
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+    const data = callbackQuery.data || '';
+
+    if (!isAuthorized(chatId)) {
+        answerCallbackQuery(callbackQuery.id, '🚫 Unauthorized.');
+        return;
+    }
+
+    if (data.startsWith(UNDO_CALLBACK_PREFIX)) {
+        undoEntryById_(callbackQuery, chatId, messageId, data.substring(UNDO_CALLBACK_PREFIX.length));
+    } else if (data.startsWith(SAVE_PRESET_CALLBACK_PREFIX)) {
+        handleSavePresetButton(callbackQuery, chatId, messageId, data.substring(SAVE_PRESET_CALLBACK_PREFIX.length));
+    }
 }

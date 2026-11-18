@@ -28,21 +28,6 @@ function undoLastLog(chatId) {
  * whenever an earlier row is deleted or inserted, so an id always finds the
  * right entry, including after you edit the sheet by hand.
  */
-function handleCallbackQuery(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-    const messageId = callbackQuery.message.message_id;
-    const data = callbackQuery.data;
-
-    if (!isAuthorized(chatId)) {
-        answerCallbackQuery(callbackQuery.id, '🚫 Unauthorized.');
-        return;
-    }
-
-    if (data && data.startsWith(UNDO_CALLBACK_PREFIX)) {
-        undoEntryById_(callbackQuery, chatId, messageId, data.substring(UNDO_CALLBACK_PREFIX.length));
-    }
-}
-
 function undoEntryById_(callbackQuery, chatId, messageId, entryId) {
     const row = findLogRowById_(entryId);
 

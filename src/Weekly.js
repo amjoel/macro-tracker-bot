@@ -65,8 +65,10 @@ function runWeeklyRollover() {
     // Nothing to do if this week already has a row
     if (findWeekRowIndex_(data, thisMondayStr, timeZone) > 0) return;
 
+    // Leftover calories carry forward, and so does overspending: a week over
+    // budget gives a negative rollover that takes the excess off the next week
     const weeklyBaseTarget = getGoals().calories * 7;
-    const rolloverIn = Math.max(getPreviousWeekDeficit_(data, prevMondayStr, timeZone), 0);
+    const rolloverIn = getPreviousWeekDeficit_(data, prevMondayStr, timeZone);
 
     appendWeekRow_(summarySheet, thisMondayStr, weeklyBaseTarget, rolloverIn);
 
@@ -114,16 +116,19 @@ function sendSummaryMessage(chatId) {
     const remainingBudget = totalBudget - snapshot.weekConsumed;
     const rolloverIn = snapshot.weekRolloverIn;
 
-    let msg = `📊 *Daily & Weekly Summary* (${todayStr})\n\n` +
-        `*Calories:* ${snapshot.calories} / ${goals.calories} kcal\n` +
-        `*Protein:* ${snapshot.protein}g / ${goals.protein}g\n` +
-        `*Carbs:* ${snapshot.carbs}g / ${goals.carbs}g | *Fats:* ${snapshot.fats}g\n\n`;
+    const targets = snapshot.targets;
 
+    let msg = `📊 *Daily & Weekly Summary* (${todayStr})\n\n` +
+        `*Calories:* ${snapshot.calories} / ${targets.calories} kcal\n` +
+        `*Protein:* ${snapshot.protein}g / ${targets.protein}g\n` +
+        `*Carbs:* ${snapshot.carbs}g / ${targets.carbs}g | *Fats:* ${snapshot.fats}g` +
+        formatTargetNote(targets) + `\n\n`;
+
+    msg += `*Weekly Budget:* ${remainingBudget} / ${totalBudget} kcal left`;
     if (rolloverIn > 0) {
-        msg += `*Weekly Budget:* ${remainingBudget} / ${totalBudget} kcal left\n` +
-            `_(includes ${rolloverIn} kcal rollover)_`;
-    } else {
-        msg += `*Weekly Budget:* ${remainingBudget} / ${totalBudget} kcal left`;
+        msg += `\n_(includes ${rolloverIn} kcal rollover)_`;
+    } else if (rolloverIn < 0) {
+        msg += `\n_(${-rolloverIn} kcal taken off for going over last week)_`;
     }
 
     sendTelegramMessage(chatId, msg, getMainMenuKeyboard());

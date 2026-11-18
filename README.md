@@ -15,8 +15,10 @@ Telegram  ->  Apps Script web app (doPost)  ->  Google Sheets
 - **Natural language logging.** Text any meal and macros are estimated by Gemini.
 - **Consistent repeat entries.** Previously seen text inputs are answered from a "Macro Cache" sheet, so the same meal always logs the same numbers and costs no API call.
 - **Presets.** `/addpreset shortcut,Name,Cal,P,C,F` creates one-tap shortcuts that appear on the bot keyboard.
+- **Save a log as a preset.** Tap "⭐ Save as Preset" under any logged meal, or send `/savepreset` for the latest one, then reply with a shortcut name. `/savepreset name` does it in one step. Names that clash with an existing preset, a command or a menu button are refused.
 - **Editable goals.** `/setgoals Cal,Protein,Carbs` and a live "left today" progress readout.
-- **Weekly calorie budget.** A weekly summary row is created automatically. Unspent calories roll over into the next week.
+- **Targets that follow your week.** Each day's calorie and protein target is what is left of the week's base target (rollover excluded) split over the days left, including today. It is fixed for the day, so eating today counts as "left", not a lower target. Calories never drop below the minimum in `Settings` (2000 by default). Protein only goes up to catch up, never below your protein goal.
+- **Weekly calorie budget.** A weekly summary row is created automatically. Unspent calories roll over into the next week, and going over budget rolls over too, as a negative amount that comes off the next week's budget.
 - **Weight tracking.** `/weight 68.5` logs scale weight with a 7-day moving average.
 - **Undo.** An inline "Undo This Entry" button on every log, plus an "Undo Last" menu action.
 - **Evening protein nudge.** A time-driven trigger warns you if you are behind on protein.
@@ -42,13 +44,13 @@ The script expects these tabs in the bound spreadsheet. `setupSheets()` creates 
 | Sheet | Purpose |
 | --- | --- |
 | `Logs` | One row per entry: date, time, raw input, food item, calories, protein, carbs, fats, entry id |
-| `Dashboard` | Formulas. `B1:B4` today's calories, protein, carbs, fats. `B5:B9` this week's start, total budget, rollover in, consumed and budget left |
+| `Dashboard` | Formulas. `B1:B4` today's calories, protein, carbs, fats. `B5:B9` this week's start, total budget, rollover in, consumed and budget left. `B10:B14` this week's base target, protein so far, days left, and today's adjusted calorie and protein targets |
 | `Presets` | Shortcut key, item name, calories, protein, carbs, fat |
 | `Macro Cache` | Normalised input to macros (hidden, auto-created) |
 | `Weekly Summary` | Week start, base target, rollover in (written by the bot), then total budget, consumed and deficit as formulas |
 | `Weight` | Date, weight, and a formula for the average of the last 7 days by date (auto-created) |
-| `Settings` | Your daily calorie, protein and carb goals. Edit here or with `/setgoals` |
-| `Daily` | Formulas only. One row per day from your first log to today, with totals, goals, whether protein was met, and 7-day averages. The bot never reads it |
+| `Settings` | Your daily calorie, protein and carb goals (edit here or with `/setgoals`), and the minimum daily calories for adjusted targets |
+| `Daily` | Formulas only. One row per day from your first log to today, with totals, that day's adjusted goals, whether protein was met, and 7-day averages. The bot never reads it |
 
 ## Setup from scratch
 
@@ -104,11 +106,12 @@ clasp logs                                   # view execution logs
 ```
 src/
   Main.js          doPost webhook entry point, duplicate update check, error reporting
-  Router.js        Maps a text message to a command handler or to food logging
+  Router.js        Maps a text message or inline button tap to its handler
   FoodLogging.js   Preset, then macro cache, then Gemini, then log and reply
   Gemini.js        Model fallback, rate limit cooldowns, response parsing
   MacroCache.js    Three layer cache so the same text always gives the same macros
-  Presets.js       Saved shortcuts and /addpreset
+  Presets.js       Saved shortcuts, /addpreset and shortcut name checks
+  SavePreset.js    "Save as Preset" button and /savepreset, turns a log entry into a preset
   Goals.js         Daily goals and /setgoals
   Weight.js        /weight and the moving average
   Weekly.js        Weekly budget rollover and the summary message

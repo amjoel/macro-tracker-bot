@@ -23,7 +23,7 @@ const SHEET = {
 };
 
 // ── Settings sheet rows (value in column B) ──
-const SETTINGS_ROW = { CALORIES: 2, PROTEIN: 3, CARBS: 4 };
+const SETTINGS_ROW = { CALORIES: 2, PROTEIN: 3, CARBS: 4, MIN_CALORIES: 5 };
 
 // ── Logs sheet columns (1 based) ──
 const LOG_COL = {

@@ -1,14 +1,21 @@
 /** Telegram Bot API calls and keyboards. */
 
 /** Calls a Telegram Bot API method with a JSON body. */
+/** Calls a Telegram Bot API method with a JSON body and returns the parsed response. */
 function callTelegram_(method, payload) {
-    return UrlFetchApp.fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/${method}`, {
+    const response = UrlFetchApp.fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/${method}`, {
         method: 'post',
         contentType: 'application/json',
         payload: JSON.stringify(payload)
     });
+    try {
+        return JSON.parse(response.getContentText());
+    } catch (e) {
+        return null;
+    }
 }
 
+/** Sends a message and returns its message id (null if Telegram didn't say). */
 function sendTelegramMessage(chatId, text, replyMarkup, inlineMarkup) {
     const payload = {
         chat_id: chatId,
@@ -24,7 +31,8 @@ function sendTelegramMessage(chatId, text, replyMarkup, inlineMarkup) {
         payload.reply_markup = replyMarkup;
     }
 
-    callTelegram_('sendMessage', payload);
+    const response = callTelegram_('sendMessage', payload);
+    return response && response.result ? response.result.message_id : null;
 }
 
 function editTelegramMessage(chatId, messageId, newText) {
@@ -36,12 +44,16 @@ function editTelegramMessage(chatId, messageId, newText) {
     });
 }
 
-function editTelegramMessageRemoveInline(chatId, messageId) {
+function editTelegramMessageMarkup(chatId, messageId, inlineMarkup) {
     callTelegram_('editMessageReplyMarkup', {
         chat_id: chatId,
         message_id: messageId,
-        reply_markup: { inline_keyboard: [] }
+        reply_markup: inlineMarkup
     });
+}
+
+function editTelegramMessageRemoveInline(chatId, messageId) {
+    editTelegramMessageMarkup(chatId, messageId, { inline_keyboard: [] });
 }
 
 function answerCallbackQuery(callbackQueryId, text) {
@@ -89,11 +101,14 @@ function getMainMenuKeyboard() {
     };
 }
 
-/** Inline button that undoes the log entry with the given id. */
-function getUndoInlineKeyboard(entryId) {
-    return {
-        inline_keyboard: [
-            [{ text: '↩️ Undo This Entry', callback_data: UNDO_CALLBACK_PREFIX + entryId }]
-        ]
-    };
+/**
+ * Inline buttons under a log message: undo, and optionally save as a preset.
+ * Both carry the entry's id, never a row number.
+ */
+function getLogInlineKeyboard(entryId, canSavePreset) {
+    const rows = [[{ text: '↩️ Undo This Entry', callback_data: UNDO_CALLBACK_PREFIX + entryId }]];
+    if (canSavePreset) {
+        rows.push([{ text: '⭐ Save as Preset', callback_data: SAVE_PRESET_CALLBACK_PREFIX + entryId }]);
+    }
+    return { inline_keyboard: rows };
 }
